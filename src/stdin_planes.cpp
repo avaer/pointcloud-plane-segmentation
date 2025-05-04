@@ -162,25 +162,27 @@ int main(int argc, char *argv[]) {
               << (nrNeighborsProvided ? " (user-provided)" : " (default)") << std::endl;
     
     // Only set parameters that were explicitly provided
+    // Set and log parameters with safer handling
     if (minNormalDiffProvided) {
         rspd.minNormalDiff(minNormalDiff);
         std::cerr << "  minNormalDiff: " << minNormalDiff << " (user-provided)" << std::endl;
     } else {
-        std::cerr << "  minNormalDiff: " << rspd.minNormalDiff() << " (default)" << std::endl;
+        // Don't try to access the getter if it might not exist
+        std::cerr << "  minNormalDiff: using default value" << std::endl;
     }
     
     if (maxDistProvided) {
         rspd.maxDist(maxDist);
         std::cerr << "  maxDist: " << maxDist << " (user-provided)" << std::endl;
     } else {
-        std::cerr << "  maxDist: " << rspd.maxDist() << " (default)" << std::endl;
+        std::cerr << "  maxDist: using default value" << std::endl;
     }
     
     if (outlierRatioProvided) {
         rspd.outlierRatio(outlierRatio);
         std::cerr << "  outlierRatio: " << outlierRatio << " (user-provided)" << std::endl;
     } else {
-        std::cerr << "  outlierRatio: " << rspd.outlierRatio() << " (default)" << std::endl;
+        std::cerr << "  outlierRatio: using default value" << std::endl;
     }
     
     // Detect planes
