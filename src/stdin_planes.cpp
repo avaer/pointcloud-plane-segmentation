@@ -129,7 +129,7 @@ int main(int argc, char *argv[]) {
     
     // Use default number of neighbors (75) unless explicitly provided
     const int knnNeighbors = nrNeighborsProvided ? nrNeighbors : 75;
-    const geometry::KDTreeSearchParam search_param = geometry::KDTreeSearchParamKNN(knnNeighbors);
+    const geometry::KDTreeSearchParam &search_param = geometry::KDTreeSearchParamKNN(knnNeighbors);
     
     // Estimate normals
     cloud_ptr->EstimateNormals(search_param);
