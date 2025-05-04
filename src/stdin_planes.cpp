@@ -57,6 +57,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
+    // Debug output: show received command-line arguments
+    std::cerr << "Command-line arguments received:" << std::endl;
+    for (int i = 0; i < argc; i++) {
+        std::cerr << "  argv[" << i << "]: " << argv[i] << std::endl;
+    }
+    
     int width = std::stoi(argv[1]);
     int height = std::stoi(argv[2]);
     int totalPoints = width * height;
@@ -144,22 +150,48 @@ int main(int argc, char *argv[]) {
     }
     
     // Create PlaneDetector with appropriate minNumPoints
-    PlaneDetector rspd(cloud_ptr, neighbors, minNumPointsProvided ? minNumPoints : 30);
+    size_t effectiveMinNumPoints = minNumPointsProvided ? minNumPoints : 30;
+    PlaneDetector rspd(cloud_ptr, neighbors, effectiveMinNumPoints);
+    
+    // Debug output for parameters
+    std::cerr << "Point cloud has " << cloud_ptr->points_.size() << " points" << std::endl;
+    std::cerr << "Parameters used:" << std::endl;
+    std::cerr << "  minNumPoints: " << effectiveMinNumPoints 
+              << (minNumPointsProvided ? " (user-provided)" : " (default)") << std::endl;
+    std::cerr << "  nrNeighbors: " << knnNeighbors 
+              << (nrNeighborsProvided ? " (user-provided)" : " (default)") << std::endl;
     
     // Only set parameters that were explicitly provided
     if (minNormalDiffProvided) {
         rspd.minNormalDiff(minNormalDiff);
+        std::cerr << "  minNormalDiff: " << minNormalDiff << " (user-provided)" << std::endl;
+    } else {
+        std::cerr << "  minNormalDiff: " << rspd.minNormalDiff() << " (default)" << std::endl;
     }
     
     if (maxDistProvided) {
         rspd.maxDist(maxDist);
+        std::cerr << "  maxDist: " << maxDist << " (user-provided)" << std::endl;
+    } else {
+        std::cerr << "  maxDist: " << rspd.maxDist() << " (default)" << std::endl;
     }
     
     if (outlierRatioProvided) {
         rspd.outlierRatio(outlierRatio);
+        std::cerr << "  outlierRatio: " << outlierRatio << " (user-provided)" << std::endl;
+    } else {
+        std::cerr << "  outlierRatio: " << rspd.outlierRatio() << " (default)" << std::endl;
     }
     
+    // Detect planes
+    auto start_time = std::chrono::high_resolution_clock::now();
     std::set<Plane*> planes = rspd.detect();
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    
+    // Debug output for results
+    std::cerr << "Plane detection completed in " << duration << " ms" << std::endl;
+    std::cerr << "Detected " << planes.size() << " planes" << std::endl;
     
     // Output planes as JSON
     output_json(planes);

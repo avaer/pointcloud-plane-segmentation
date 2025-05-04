@@ -1,11 +1,18 @@
 import os
 import json
 import subprocess
+import logging
 from typing import List
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 # Define data models
 class Plane(BaseModel):
@@ -28,8 +35,12 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
+# Set up logger
+logger = logging.getLogger("plane_detection_api")
+
 # Path to the C++ executable
 EXECUTABLE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", "stdin_planes")
+logger.info(f"C++ executable path: {EXECUTABLE_PATH}")
 
 @app.get("/")
 async def read_root():
@@ -46,6 +57,8 @@ async def detect_planes(
     min_num_points: int = Query(None, description="Minimum number of points (default: 30)"),
     nr_neighbors: int = Query(None, description="Number of neighbors for KNN (default: 75)")
 ):
+    logger.info(f"Received plane detection request: width={width}, height={height}")
+    
     # Get raw query parameters to check which ones were actually provided
     query_params = dict(request.query_params)
     param_provided = {
@@ -55,15 +68,25 @@ async def detect_planes(
         "min_num_points": "min_num_points" in query_params,
         "nr_neighbors": "nr_neighbors" in query_params
     }
+    
+    # Log which parameters were provided
+    for param, provided in param_provided.items():
+        if provided:
+            value = locals()[param]
+            logger.info(f"Parameter provided: {param}={value}")
+    
     # Read raw binary data from request
     binary_data = await request.body()
+    data_size = len(binary_data)
+    logger.info(f"Received binary data: {data_size} bytes")
     
     # Expected size: 4 bytes (f32) * 3 coordinates * width * height
     expected_bytes = 4 * 3 * width * height
-    if len(binary_data) != expected_bytes:
+    if data_size != expected_bytes:
+        logger.error(f"Binary data size mismatch: got {data_size} bytes, expected {expected_bytes} bytes")
         raise HTTPException(
             status_code=400,
-            detail=f"Binary data size mismatch: got {len(binary_data)} bytes, expected {expected_bytes} bytes"
+            detail=f"Binary data size mismatch: got {data_size} bytes, expected {expected_bytes} bytes"
         )
     
     # Check if executable exists
@@ -93,6 +116,9 @@ async def detect_planes(
         if param_provided["nr_neighbors"] and nr_neighbors is not None:
             command.extend(["--nr-neighbors", str(nr_neighbors)])
         
+        # Log the command being executed
+        logger.info(f"Executing C++ command: {' '.join(command)}")
+        
         # Run the C++ program and pass the binary data directly
         process = subprocess.Popen(
             command,
@@ -104,20 +130,41 @@ async def detect_planes(
         # Send binary input and get output
         stdout, stderr = process.communicate(input=binary_data)
         
+        stderr_output = stderr.decode() if stderr else ""
+        
+        # Log stderr output even if the process succeeds (for debugging)
+        if stderr_output:
+            print("\n--- C++ APPLICATION DEBUG OUTPUT ---")
+            print(stderr_output)
+            print("--- END C++ DEBUG OUTPUT ---\n")
+            
         if process.returncode != 0:
             raise HTTPException(
                 status_code=500,
-                detail=f"C++ process failed with code {process.returncode}: {stderr.decode()}"
+                detail=f"C++ process failed with code {process.returncode}: {stderr_output}"
             )
         
         # Parse JSON output
         try:
-            planes = json.loads(stdout.decode())
-            return planes
-        except json.JSONDecodeError as e:
+            stdout_text = stdout.decode()
+            logger.info(f"C++ process completed with return code: {process.returncode}")
+            
+            try:
+                planes = json.loads(stdout_text)
+                logger.info(f"Successfully parsed JSON output: {len(planes)} planes detected")
+                return planes
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse JSON output: {e}")
+                logger.error(f"First 200 chars of output: {stdout_text[:200]}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to parse JSON output: {e}. Output was: {stdout_text[:200]}..."
+                )
+        except Exception as e:
+            logger.error(f"Error processing C++ output: {str(e)}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to parse JSON output: {e}. Output was: {stdout.decode()[:200]}..."
+                detail=f"Error processing C++ output: {str(e)}"
             )
     
     except Exception as e:
