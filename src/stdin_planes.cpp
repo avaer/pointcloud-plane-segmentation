@@ -68,20 +68,32 @@ int main(int argc, char *argv[]) {
     size_t minNumPoints = 30;       // count
     int nrNeighbors = 75;           // count
     
+    // Track which parameters were provided
+    bool minNormalDiffProvided = false;
+    bool maxDistProvided = false;
+    bool outlierRatioProvided = false;
+    bool minNumPointsProvided = false;
+    bool nrNeighborsProvided = false;
+    
     // Parse optional parameters
     for (int i = 3; i < argc; i++) {
         std::string arg = argv[i];
         
         if (arg == "--min-normal-diff" && i + 1 < argc) {
             minNormalDiff = std::stod(argv[++i]);
+            minNormalDiffProvided = true;
         } else if (arg == "--max-dist" && i + 1 < argc) {
             maxDist = std::stod(argv[++i]);
+            maxDistProvided = true;
         } else if (arg == "--outlier-ratio" && i + 1 < argc) {
             outlierRatio = std::stod(argv[++i]);
+            outlierRatioProvided = true;
         } else if (arg == "--min-num-points" && i + 1 < argc) {
             minNumPoints = std::stoi(argv[++i]);
+            minNumPointsProvided = true;
         } else if (arg == "--nr-neighbors" && i + 1 < argc) {
             nrNeighbors = std::stoi(argv[++i]);
+            nrNeighborsProvided = true;
         } else {
             std::cerr << "Unknown parameter: " << arg << std::endl;
             print_usage(argv[0]);
@@ -109,8 +121,9 @@ int main(int argc, char *argv[]) {
         cloud_ptr->points_.push_back(point);
     }
     
-    // Parameters
-    const geometry::KDTreeSearchParam &search_param = geometry::KDTreeSearchParamKNN(nrNeighbors);
+    // Use default number of neighbors (75) unless explicitly provided
+    const int knnNeighbors = nrNeighborsProvided ? nrNeighbors : 75;
+    const geometry::KDTreeSearchParam search_param = geometry::KDTreeSearchParamKNN(knnNeighbors);
     
     // Estimate normals
     cloud_ptr->EstimateNormals(search_param);
@@ -130,13 +143,21 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    // Detect planes
-    PlaneDetector rspd(cloud_ptr, neighbors, minNumPoints);
+    // Create PlaneDetector with appropriate minNumPoints
+    PlaneDetector rspd(cloud_ptr, neighbors, minNumPointsProvided ? minNumPoints : 30);
     
-    // Set optional parameters if provided
-    rspd.minNormalDiff(minNormalDiff);
-    rspd.maxDist(maxDist);
-    rspd.outlierRatio(outlierRatio);
+    // Only set parameters that were explicitly provided
+    if (minNormalDiffProvided) {
+        rspd.minNormalDiff(minNormalDiff);
+    }
+    
+    if (maxDistProvided) {
+        rspd.maxDist(maxDist);
+    }
+    
+    if (outlierRatioProvided) {
+        rspd.outlierRatio(outlierRatio);
+    }
     
     std::set<Plane*> planes = rspd.detect();
     

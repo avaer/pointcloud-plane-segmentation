@@ -46,6 +46,15 @@ async def detect_planes(
     min_num_points: int = Query(None, description="Minimum number of points (default: 30)"),
     nr_neighbors: int = Query(None, description="Number of neighbors for KNN (default: 75)")
 ):
+    # Get raw query parameters to check which ones were actually provided
+    query_params = dict(request.query_params)
+    param_provided = {
+        "min_normal_diff": "min_normal_diff" in query_params,
+        "max_dist": "max_dist" in query_params,
+        "outlier_ratio": "outlier_ratio" in query_params,
+        "min_num_points": "min_num_points" in query_params,
+        "nr_neighbors": "nr_neighbors" in query_params
+    }
     # Read raw binary data from request
     binary_data = await request.body()
     
@@ -68,16 +77,20 @@ async def detect_planes(
         # Prepare command with optional parameters
         command = [EXECUTABLE_PATH, str(width), str(height)]
         
-        # Add optional parameters if provided
-        if min_normal_diff is not None:
+        # Add optional parameters only if they were explicitly provided in the query string
+        if param_provided["min_normal_diff"] and min_normal_diff is not None:
             command.extend(["--min-normal-diff", str(min_normal_diff)])
-        if max_dist is not None:
+            
+        if param_provided["max_dist"] and max_dist is not None:
             command.extend(["--max-dist", str(max_dist)])
-        if outlier_ratio is not None:
+            
+        if param_provided["outlier_ratio"] and outlier_ratio is not None:
             command.extend(["--outlier-ratio", str(outlier_ratio)])
-        if min_num_points is not None:
+            
+        if param_provided["min_num_points"] and min_num_points is not None:
             command.extend(["--min-num-points", str(min_num_points)])
-        if nr_neighbors is not None:
+            
+        if param_provided["nr_neighbors"] and nr_neighbors is not None:
             command.extend(["--nr-neighbors", str(nr_neighbors)])
         
         # Run the C++ program and pass the binary data directly
