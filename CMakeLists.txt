@@ -25,6 +25,13 @@ if (Open3D_FOUND)
     if(OpenMP_CXX_FOUND)
       target_link_libraries(main PRIVATE OpenMP::OpenMP_CXX)
     endif()
+    
+    # Add stdin_planes executable
+    add_executable(stdin_planes src/stdin_planes.cpp)
+    target_link_libraries(stdin_planes PRIVATE Open3D::Open3D rspd)
+    if(OpenMP_CXX_FOUND)
+      target_link_libraries(stdin_planes PRIVATE OpenMP::OpenMP_CXX)
+    endif()
 else()
     message(SEND_ERROR "Open3D not found")
 endif()
