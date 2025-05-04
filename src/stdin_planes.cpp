@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstdio>
+#include <algorithm>   // For std::sort
 
 #include <Eigen/Dense>
 #include <open3d/Open3D.h>
@@ -14,12 +15,32 @@
 
 using namespace open3d;
 
-void output_json(const std::set<Plane*>& planes) {
+void output_json(const std::set<Plane*>& planes_set) {
+    // Convert set to vector for sorting
+    std::vector<Plane*> planes(planes_set.begin(), planes_set.end());
+    
+    // Log before sorting
+    std::cerr << "Planes before sorting:" << std::endl;
+    for (size_t i = 0; i < planes.size(); i++) {
+        std::cerr << "  Plane " << i << ": " << planes[i]->inliers().size() << " inliers" << std::endl;
+    }
+    
+    // Sort planes by inlier count (descending order)
+    std::sort(planes.begin(), planes.end(), [](const Plane* a, const Plane* b) {
+        return a->inliers().size() > b->inliers().size();
+    });
+    
+    // Log after sorting
+    std::cerr << "Planes after sorting (descending by inlier count):" << std::endl;
+    for (size_t i = 0; i < planes.size(); i++) {
+        std::cerr << "  Plane " << i << ": " << planes[i]->inliers().size() << " inliers" << std::endl;
+    }
+    
+    // Output sorted planes as JSON
     std::cout << "[" << std::endl;
     
-    auto it = planes.begin();
-    while (it != planes.end()) {
-        Plane* p = *it;
+    for (size_t i = 0; i < planes.size(); i++) {
+        Plane* p = planes[i];
         std::cout << "  {" << std::endl;
         std::cout << "    \"normal\": [" << p->normal().x() << ", " << p->normal().y() << ", " << p->normal().z() << "]," << std::endl;
         std::cout << "    \"center\": [" << p->center().x() << ", " << p->center().y() << ", " << p->center().z() << "]," << std::endl;
@@ -29,8 +50,7 @@ void output_json(const std::set<Plane*>& planes) {
         std::cout << "    \"inlierCount\": " << p->inliers().size() << std::endl;
         std::cout << "  }";
         
-        ++it;
-        if (it != planes.end()) {
+        if (i < planes.size() - 1) {
             std::cout << "," << std::endl;
         } else {
             std::cout << std::endl;
