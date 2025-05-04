@@ -55,7 +55,8 @@ async def detect_planes(
     max_dist: float = Query(None, description="Maximum distance in degrees (default: 75)"),
     outlier_ratio: float = Query(None, description="Maximum outlier ratio (default: 0.75)"),
     min_num_points: int = Query(None, description="Minimum number of points (default: 30)"),
-    nr_neighbors: int = Query(None, description="Number of neighbors for KNN (default: 75)")
+    nr_neighbors: int = Query(None, description="Number of neighbors for KNN (default: 75)"),
+    max_planes: int = Query(None, description="Maximum number of planes to return")
 ):
     logger.info(f"Received plane detection request: width={width}, height={height}")
     
@@ -66,7 +67,8 @@ async def detect_planes(
         "max_dist": "max_dist" in query_params,
         "outlier_ratio": "outlier_ratio" in query_params,
         "min_num_points": "min_num_points" in query_params,
-        "nr_neighbors": "nr_neighbors" in query_params
+        "nr_neighbors": "nr_neighbors" in query_params,
+        "max_planes": "max_planes" in query_params
     }
     
     # Log which parameters were provided
@@ -115,6 +117,9 @@ async def detect_planes(
             
         if param_provided["nr_neighbors"] and nr_neighbors is not None:
             command.extend(["--nr-neighbors", str(nr_neighbors)])
+            
+        if param_provided["max_planes"] and max_planes is not None:
+            command.extend(["--max-planes", str(max_planes)])
         
         # Log the command being executed
         logger.info(f"Executing C++ command: {' '.join(command)}")

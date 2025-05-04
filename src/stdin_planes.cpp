@@ -15,7 +15,7 @@
 
 using namespace open3d;
 
-void output_json(const std::set<Plane*>& planes_set) {
+void output_json(const std::set<Plane*>& planes_set, int maxPlanes = -1) {
     // Convert set to vector for sorting
     std::vector<Plane*> planes(planes_set.begin(), planes_set.end());
     
@@ -30,16 +30,23 @@ void output_json(const std::set<Plane*>& planes_set) {
         return a->inliers().size() > b->inliers().size();
     });
     
+    // Limit the number of planes if maxPlanes is specified
+    size_t numPlanesToOutput = planes.size();
+    if (maxPlanes > 0 && static_cast<size_t>(maxPlanes) < numPlanesToOutput) {
+        numPlanesToOutput = static_cast<size_t>(maxPlanes);
+        std::cerr << "Limiting output to " << numPlanesToOutput << " planes (out of " << planes.size() << " detected)" << std::endl;
+    }
+    
     // Log after sorting
     std::cerr << "Planes after sorting (descending by inlier count):" << std::endl;
-    for (size_t i = 0; i < planes.size(); i++) {
+    for (size_t i = 0; i < numPlanesToOutput; i++) {
         std::cerr << "  Plane " << i << ": " << planes[i]->inliers().size() << " inliers" << std::endl;
     }
     
     // Output sorted planes as JSON
     std::cout << "[" << std::endl;
     
-    for (size_t i = 0; i < planes.size(); i++) {
+    for (size_t i = 0; i < numPlanesToOutput; i++) {
         Plane* p = planes[i];
         std::cout << "  {" << std::endl;
         std::cout << "    \"normal\": [" << p->normal().x() << ", " << p->normal().y() << ", " << p->normal().z() << "]," << std::endl;
@@ -50,7 +57,7 @@ void output_json(const std::set<Plane*>& planes_set) {
         std::cout << "    \"inlierCount\": " << p->inliers().size() << std::endl;
         std::cout << "  }";
         
-        if (i < planes.size() - 1) {
+        if (i < numPlanesToOutput - 1) {
             std::cout << "," << std::endl;
         } else {
             std::cout << std::endl;
@@ -68,6 +75,7 @@ void print_usage(const char* program_name) {
     std::cerr << "  --outlier-ratio <ratio>         Maximum outlier ratio (default: 0.75)" << std::endl;
     std::cerr << "  --min-num-points <count>        Minimum number of points (default: 30)" << std::endl;
     std::cerr << "  --nr-neighbors <count>          Number of neighbors for KNN (default: 75)" << std::endl;
+    std::cerr << "  --max-planes <count>            Maximum number of planes to return" << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -93,6 +101,7 @@ int main(int argc, char *argv[]) {
     double outlierRatio = 0.75;     // ratio
     size_t minNumPoints = 30;       // count
     int nrNeighbors = 75;           // count
+    int maxPlanes = -1;             // no limit by default
     
     // Track which parameters were provided
     bool minNormalDiffProvided = false;
@@ -100,6 +109,7 @@ int main(int argc, char *argv[]) {
     bool outlierRatioProvided = false;
     bool minNumPointsProvided = false;
     bool nrNeighborsProvided = false;
+    bool maxPlanesProvided = false;
     
     // Parse optional parameters
     for (int i = 3; i < argc; i++) {
@@ -120,6 +130,9 @@ int main(int argc, char *argv[]) {
         } else if (arg == "--nr-neighbors" && i + 1 < argc) {
             nrNeighbors = std::stoi(argv[++i]);
             nrNeighborsProvided = true;
+        } else if (arg == "--max-planes" && i + 1 < argc) {
+            maxPlanes = std::stoi(argv[++i]);
+            maxPlanesProvided = true;
         } else {
             std::cerr << "Unknown parameter: " << arg << std::endl;
             print_usage(argv[0]);
@@ -180,6 +193,9 @@ int main(int argc, char *argv[]) {
               << (minNumPointsProvided ? " (user-provided)" : " (default)") << std::endl;
     std::cerr << "  nrNeighbors: " << knnNeighbors 
               << (nrNeighborsProvided ? " (user-provided)" : " (default)") << std::endl;
+    if (maxPlanesProvided) {
+        std::cerr << "  maxPlanes: " << maxPlanes << " (user-provided)" << std::endl;
+    }
     
     // Only set parameters that were explicitly provided
     // Set and log parameters with safer handling
@@ -215,8 +231,8 @@ int main(int argc, char *argv[]) {
     std::cerr << "Plane detection completed in " << duration << " ms" << std::endl;
     std::cerr << "Detected " << planes.size() << " planes" << std::endl;
     
-    // Output planes as JSON
-    output_json(planes);
+    // Output planes as JSON, limiting by maxPlanes if specified
+    output_json(planes, maxPlanes);
     
     return 0;
 }
