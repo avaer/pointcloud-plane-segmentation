@@ -39,7 +39,12 @@ async def read_root():
 async def detect_planes(
     request: Request,
     width: int = Query(..., description="Width of the point cloud grid"),
-    height: int = Query(..., description="Height of the point cloud grid")
+    height: int = Query(..., description="Height of the point cloud grid"),
+    min_normal_diff: float = Query(None, description="Minimum normal difference in degrees (default: 60)"),
+    max_dist: float = Query(None, description="Maximum distance in degrees (default: 75)"),
+    outlier_ratio: float = Query(None, description="Maximum outlier ratio (default: 0.75)"),
+    min_num_points: int = Query(None, description="Minimum number of points (default: 30)"),
+    nr_neighbors: int = Query(None, description="Number of neighbors for KNN (default: 75)")
 ):
     # Read raw binary data from request
     binary_data = await request.body()
@@ -60,9 +65,24 @@ async def detect_planes(
         )
     
     try:
+        # Prepare command with optional parameters
+        command = [EXECUTABLE_PATH, str(width), str(height)]
+        
+        # Add optional parameters if provided
+        if min_normal_diff is not None:
+            command.extend(["--min-normal-diff", str(min_normal_diff)])
+        if max_dist is not None:
+            command.extend(["--max-dist", str(max_dist)])
+        if outlier_ratio is not None:
+            command.extend(["--outlier-ratio", str(outlier_ratio)])
+        if min_num_points is not None:
+            command.extend(["--min-num-points", str(min_num_points)])
+        if nr_neighbors is not None:
+            command.extend(["--nr-neighbors", str(nr_neighbors)])
+        
         # Run the C++ program and pass the binary data directly
         process = subprocess.Popen(
-            [EXECUTABLE_PATH, str(width), str(height)],
+            command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE

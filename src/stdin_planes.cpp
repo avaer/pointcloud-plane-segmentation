@@ -40,16 +40,54 @@ void output_json(const std::set<Plane*>& planes) {
     std::cout << "]" << std::endl;
 }
 
+void print_usage(const char* program_name) {
+    std::cerr << "Usage: " << program_name << " <width> <height> [options]" << std::endl;
+    std::cerr << "Options:" << std::endl;
+    std::cerr << "  --min-normal-diff <degrees>     Minimum normal difference (default: 60)" << std::endl;
+    std::cerr << "  --max-dist <degrees>            Maximum distance (default: 75)" << std::endl;
+    std::cerr << "  --outlier-ratio <ratio>         Maximum outlier ratio (default: 0.75)" << std::endl;
+    std::cerr << "  --min-num-points <count>        Minimum number of points (default: 30)" << std::endl;
+    std::cerr << "  --nr-neighbors <count>          Number of neighbors for KNN (default: 75)" << std::endl;
+}
+
 int main(int argc, char *argv[]) {
     // Parse width and height from command line arguments
-    if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <width> <height>" << std::endl;
+    if (argc < 3) {
+        print_usage(argv[0]);
         return 1;
     }
     
     int width = std::stoi(argv[1]);
     int height = std::stoi(argv[2]);
     int totalPoints = width * height;
+    
+    // Default parameter values
+    double minNormalDiff = 60.0;    // degrees
+    double maxDist = 75.0;          // degrees
+    double outlierRatio = 0.75;     // ratio
+    size_t minNumPoints = 30;       // count
+    int nrNeighbors = 75;           // count
+    
+    // Parse optional parameters
+    for (int i = 3; i < argc; i++) {
+        std::string arg = argv[i];
+        
+        if (arg == "--min-normal-diff" && i + 1 < argc) {
+            minNormalDiff = std::stod(argv[++i]);
+        } else if (arg == "--max-dist" && i + 1 < argc) {
+            maxDist = std::stod(argv[++i]);
+        } else if (arg == "--outlier-ratio" && i + 1 < argc) {
+            outlierRatio = std::stod(argv[++i]);
+        } else if (arg == "--min-num-points" && i + 1 < argc) {
+            minNumPoints = std::stoi(argv[++i]);
+        } else if (arg == "--nr-neighbors" && i + 1 < argc) {
+            nrNeighbors = std::stoi(argv[++i]);
+        } else {
+            std::cerr << "Unknown parameter: " << arg << std::endl;
+            print_usage(argv[0]);
+            return 1;
+        }
+    }
     
     // Read binary f32 points from stdin
     std::vector<Eigen::Vector3d> points;
@@ -72,7 +110,6 @@ int main(int argc, char *argv[]) {
     }
     
     // Parameters
-    static constexpr int nrNeighbors = 75;
     const geometry::KDTreeSearchParam &search_param = geometry::KDTreeSearchParamKNN(nrNeighbors);
     
     // Estimate normals
@@ -94,7 +131,13 @@ int main(int argc, char *argv[]) {
     }
     
     // Detect planes
-    PlaneDetector rspd(cloud_ptr, neighbors);
+    PlaneDetector rspd(cloud_ptr, neighbors, minNumPoints);
+    
+    // Set optional parameters if provided
+    rspd.minNormalDiff(minNormalDiff);
+    rspd.maxDist(maxDist);
+    rspd.outlierRatio(outlierRatio);
+    
     std::set<Plane*> planes = rspd.detect();
     
     // Output planes as JSON
